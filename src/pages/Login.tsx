@@ -8,6 +8,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { MessageSquare } from 'lucide-react';
 
+const extractEmailFromSimpleToken = (token: string): string | null => {
+    // Префикс, который вы используете на бэкенде
+    const prefix = 'demo-token-for-'; 
+    
+    if (token.startsWith(prefix)) {
+        // Извлекаем часть строки после префикса
+        return token.substring(prefix.length);
+    }
+    
+    // Если токен не соответствует ожидаемому формату, возвращаем null
+    return null;
+};
+
+
+
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,24 +35,36 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     try {
-      // Demo: simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In real app: const response = await fetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-      const mockToken = 'demo-jwt-token-' + Date.now();
-      
-      login(mockToken);
+      // Send credentials to backend
+      const res = await fetch('http://localhost:8000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Ошибка входа');
+      }
+
+      const data = await res.json();
+      const token = data.token;
+      if (!token) throw new Error('Токен не получен');
+
+      const userEmail = extractEmailFromSimpleToken(token);
+      const displayEmail = userEmail || 'Гость';
+
+      login(token);
       toast({
-        title: 'Успешный вход',
+        title: `Успешный вход, ${displayEmail}`,
         description: 'Добро пожаловать в Q&A Bot!',
       });
       navigate('/chat');
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Ошибка входа',
-        description: 'Проверьте учетные данные и попробуйте снова.',
+        description: error?.message || 'Проверьте учетные данные и попробуйте снова.',
         variant: 'destructive',
       });
     } finally {
